@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Phishing Checker – Verificador de Links</title>
+
+    <style>
+        /* ======= ESTILO GLOBAL ======= */
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #eef2f7;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: white;
+            padding: 22px 0;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .logo {
+            width: 170px;
+        }
+
+        /* ======= CONTAINER PRINCIPAL ======= */
+        .container {
+            margin: 70px auto;
+            text-align: center;
+            max-width: 680px;
+            padding: 40px 50px;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            animation: fadeUp 0.5s ease-out;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-top: 8px;
+            margin-bottom: 10px;
+            color: #1e3050;
+            font-weight: 700;
+        }
+
+        p {
+            margin-top: -5px;
+            margin-bottom: 25px;
+            color: #555;
+            font-size: 17px;
+        }
+
+        /* ======= INPUT E BOTÃO ======= */
+        input {
+            width: 90%;
+            padding: 14px;
+            border: 1px solid #c9d0da;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 12px;
+            transition: 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 5px rgba(0,123,255,0.3);
+        }
+
+        button {
+            width: 93%;
+            padding: 14px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 17px;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #0d8bff;
+            box-shadow: 0 3px 10px rgba(0,123,255,0.3);
+        }
+
+        /* ======= RESULTADO ======= */
+        .resultado {
+            display: none;
+            margin-top: 35px;
+            text-align: left;
+            background: #f8fbff;
+            padding: 22px;
+            border-radius: 12px;
+            border-left: 6px solid #007bff;
+            font-size: 16px;
+            line-height: 25px;
+            animation: fadeUp 0.4s ease-out;
+        }
+
+        /* ======= BARRA DE RISCO ======= */
+        .risco-alto { border-left-color: #e63946 !important; }
+        .risco-medio { border-left-color: #ffb703 !important; }
+        .risco-baixo { border-left-color: #00ba10 !important; }
+
+        /* ======= LOADING ANIMADO ======= */
+        .loading {
+            display: none;
+            margin-top: 15px;
+            font-size: 15px;
+            color: #007bff;
+        }
+
+        .dots::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0% { content: ''; }
+            33% { content: '.'; }
+            66% { content: '..'; }
+            100% { content: '...'; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <img src="static/logo.png" class="logo" alt="Logo">
+    </header>
+
+    <div class="container">
+        <h1>Este link é seguro?</h1>
+        <p>Analise URLs para detectar riscos, golpes e possíveis ataques de phishing.</p>
+
+        <input type="text" id="url" placeholder="Cole o link aqui...">
+        <button onclick="verificar()">Verificar</button>
+
+        <div class="loading dots" id="loading">Analisando</div>
+
+        <div class="resultado" id="resultado"></div>
+    </div>
+
+    <script>
+    async function verificar() {
+        const url = document.getElementById("url").value;
+
+        if (!url.trim()) {
+            alert("Digite uma URL válida.");
+            return;
+        }
+
+        document.getElementById("loading").style.display = "block";
+
+        const resp = await fetch("/api/check", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ url })
+        });
+
+        const data = await resp.json();
+        const box = document.getElementById("resultado");
+
+        document.getElementById("loading").style.display = "none";
+
+        // Define a cor da barra lateral baseado na classificação FINAL
+        box.className = "resultado";
+        if (data.classificacao === "ALTO") box.classList.add("risco-alto");
+        else if (data.classificacao === "MÉDIO") box.classList.add("risco-medio");
+        else box.classList.add("risco-baixo");
+
+        box.style.display = "block";
+
+        // Exibir motivos da heurística
+        const motivosHeur = data.heuristica.motivos
+            .map(m => `<li>${m}</li>`)
+            .join("");
+
+        // Motivo principal da IA
+        const motivoIA = data.ia.motivo;
+
+        box.innerHTML = `
+            <strong>🔗 URL analisada:</strong> ${data.url}<br><br>
+
+            <strong>📊 Score da Heurística:</strong> ${data.heuristica.score}<br>
+            <strong>🤖 Score da IA:</strong> ${data.ia.score}<br>
+            <strong>🎯 Score Final (IA + Heurística):</strong> ${data.score_final}<br><br>
+
+            <strong>⚠️ Classificação Final:</strong> ${data.classificacao}<br><br>
+
+            <strong>🧠 Motivo da IA:</strong>
+            <p>${motivoIA}</p>
+
+            <strong>📌 Motivos da Heurística:</strong>
+            <ul>${motivosHeur}</ul>
+
+            <strong>🕒 Data da verificação:</strong> ${data.dataVerificacao}
+        `;
+    }
+</script>
+
+
+</body>
+</html>
