@@ -150,7 +150,7 @@
         <div class="resultado" id="resultado"></div>
     </div>
 
-    <script>
+  <script>
     async function verificar() {
         const url = document.getElementById("url").value;
 
@@ -161,7 +161,8 @@
 
         document.getElementById("loading").style.display = "block";
 
-        const resp = await fetch("/api/check", {
+        // 🔥 CORRIGIDO: AGORA CHAMA A API DO RAILWAY DIRETAMENTE
+        const resp = await fetch("https://extraordinary-friendship-production.up.railway.app/api/check", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ url })
@@ -172,7 +173,6 @@
 
         document.getElementById("loading").style.display = "none";
 
-        // Define a cor da barra lateral baseado na classificação FINAL
         box.className = "resultado";
         if (data.classificacao === "ALTO") box.classList.add("risco-alto");
         else if (data.classificacao === "MÉDIO") box.classList.add("risco-medio");
@@ -180,12 +180,10 @@
 
         box.style.display = "block";
 
-        // Exibir motivos da heurística
         const motivosHeur = data.heuristica.motivos
             .map(m => `<li>${m}</li>`)
             .join("");
 
-        // Motivo principal da IA
         const motivoIA = data.ia.motivo;
 
         box.innerHTML = `
@@ -207,6 +205,7 @@
         `;
     }
 </script>
+
 
 
 </body>
