@@ -21,18 +21,31 @@ import os
 app = Flask(__name__, static_folder="static")
 
 # ---------------------------------------------------------------
-# Configuração do banco de dados (SQLite compatível com Railway)
+# Configuração do banco de dados (LOCAL + RAILWAY)
 # ---------------------------------------------------------------
 
-DB_PATH = "/data/database.db"  # LOCAL PERMITIDO NO RAILWAY
+# Railway só permite escrita em /data
+DB_PATH = "/data/database.db" if os.getenv("RAILWAY_ENVIRONMENT") else "database.db"
 
-# Cria o diretório /data se não existir
-os.makedirs("/data", exist_ok=True)
+if "RAILWAY_ENVIRONMENT" in os.environ:
+    os.makedirs("/data", exist_ok=True)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+
+# ---------------------------------------------------------------
+# Banco SEMPRE será criado ao iniciar o servidor
+# ---------------------------------------------------------------
+
+@app.before_first_request
+def initialize_database():
+    """Cria as tabelas automaticamente no Railway e local."""
+    with app.app_context():
+        db.create_all()
+        print("📌 Banco inicializado / Tabelas criadas corretamente.")
+
 
 # ---------------------------------------------------------------
 # Função de classificação final
@@ -91,6 +104,7 @@ def check_url():
         motivos="; ".join(heur["motivos"]) + f" | IA: {ia['motivo']}",
         created_at=datetime.now()
     )
+
     db.session.add(novo)
     db.session.commit()
 
@@ -117,7 +131,7 @@ def get_history():
     ])
 
 # ---------------------------------------------------------------
-# Execução principal
+# Execução local
 # ---------------------------------------------------------------
 
 if __name__ == "__main__":
