@@ -1,35 +1,32 @@
-from groq import Groq
-from dotenv import load_dotenv
-import json
+from openai import OpenAI
 import os
+import json
 
-# Carrega o .env
-load_dotenv()
-
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = OpenAI(
+    api_key=os.getenv("GROQ_API_KEY"),
+    base_url="https://api.groq.com/openai/v1"
+)
 
 def ai_analyze_url(url, heuristics_data):
-
     prompt = f"""
 Você é um analista de segurança especializado em detecção de phishing.
 
-Avalie a URL considerando:
+Avalie a URL a seguir considerando:
 - engenharia social
 - tentativa de imitar bancos/marcas
-- urgência, pressão ou recompensa ao usuário
+- urgência ou pressão ao usuário
 - estrutura do domínio, subdomínios e parâmetros
 - padrões novos que a heurística não identificou
-- sinais semânticos suspeitos
 
 NÃO repita motivos já identificados pela heurística.
 
-URL analisada:
+URL:
 {url}
 
 Heurística:
 {json.dumps(heuristics_data, indent=2)}
 
-RETORNE SOMENTE um JSON válido no formato:
+Retorne EXCLUSIVAMENTE um JSON válido no formato:
 
 {{
     "risco": "baixo" | "medio" | "alto",
@@ -38,14 +35,13 @@ RETORNE SOMENTE um JSON válido no formato:
 }}
 """
 
-    response = client.chat.completions.create(
+    completion = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0
+        temperature=0,
     )
 
-    # ACESSO CORRETO PARA O SDK NOVO
-    content = response.choices[0].message.content
+    content = completion.choices[0].message.content
 
     try:
         return json.loads(content)
@@ -53,5 +49,5 @@ RETORNE SOMENTE um JSON válido no formato:
         return {
             "risco": "medio",
             "score": 50,
-            "motivo": "A IA retornou formato inválido. Fallback aplicado."
+            "motivo": "Falha ao interpretar JSON retornado pela IA."
         }
