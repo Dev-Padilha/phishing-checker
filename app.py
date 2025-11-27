@@ -21,11 +21,17 @@ import os
 app = Flask(__name__, static_folder="static")
 
 # ---------------------------------------------------------------
-# Configuração do banco de dados (SQLite local)
+# Configuração do banco de dados (SQLite compatível com Railway)
 # ---------------------------------------------------------------
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
+DB_PATH = "/data/database.db"  # LOCAL PERMITIDO NO RAILWAY
+
+# Cria o diretório /data se não existir
+os.makedirs("/data", exist_ok=True)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 db.init_app(app)
 
 # ---------------------------------------------------------------
@@ -115,9 +121,8 @@ def get_history():
 # ---------------------------------------------------------------
 
 if __name__ == "__main__":
-    if not os.path.exists("database.db"):
-        with app.app_context():
-            db.create_all()
+    with app.app_context():
+        db.create_all()
 
     print("Servidor rodando em http://127.0.0.1:8080")
     app.run(port=8080, debug=True)
