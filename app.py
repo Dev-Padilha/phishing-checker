@@ -1,10 +1,8 @@
 """
 app.py
 ---------
-Aplicação principal em Flask que replica a API PhishingChecker feita originalmente em Spring Boot.
-Gerencia rotas, banco de dados, frontend e unifica análises: heurística + IA Groq.
-
-Autor: Biel GOAT
+Aplicação principal da API PhishingChecker.
+Compatível com Flask 3.x + Railway.
 """
 
 from flask import Flask, request, jsonify, send_from_directory
@@ -15,40 +13,29 @@ from models import db, LinkCheck
 import os
 
 # ---------------------------------------------------------------
-# Inicialização da aplicação Flask
+# Inicialização
 # ---------------------------------------------------------------
 
 app = Flask(__name__, static_folder="static")
 
 # ---------------------------------------------------------------
-# Configuração do banco de dados (LOCAL + RAILWAY)
+# Banco no diretório persistente do Railway
 # ---------------------------------------------------------------
 
-# Railway só permite escrita em /data
-DB_PATH = "/data/database.db" if os.getenv("RAILWAY_ENVIRONMENT") else "database.db"
-
-if "RAILWAY_ENVIRONMENT" in os.environ:
-    os.makedirs("/data", exist_ok=True)
+DB_PATH = "/data/database.db"
+os.makedirs("/data", exist_ok=True)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
-# ---------------------------------------------------------------
-# Banco SEMPRE será criado ao iniciar o servidor
-# ---------------------------------------------------------------
-
-@app.before_first_request
-def initialize_database():
-    """Cria as tabelas automaticamente no Railway e local."""
-    with app.app_context():
-        db.create_all()
-        print("📌 Banco inicializado / Tabelas criadas corretamente.")
-
+# Criar tabelas assim que o app carrega (Flask 3 safe)
+with app.app_context():
+    db.create_all()
 
 # ---------------------------------------------------------------
-# Função de classificação final
+# Classificação final
 # ---------------------------------------------------------------
 
 def classify(score):
@@ -59,16 +46,15 @@ def classify(score):
     return "BAIXO"
 
 # ---------------------------------------------------------------
-# Rota principal (Frontend)
+# Frontend
 # ---------------------------------------------------------------
 
 @app.route("/")
 def index():
-    """Carrega o arquivo HTML da pasta static"""
     return send_from_directory("static", "index.html")
 
 # ---------------------------------------------------------------
-# Rota de verificação de URL (Heurística + IA)
+# API principal
 # ---------------------------------------------------------------
 
 @app.route("/api/check", methods=["POST"])
@@ -76,17 +62,16 @@ def check_url():
     data = request.get_json()
     url = data.get("url")
 
-    # 1) Heurística local
+    # Heurística local
     heur = analisar_url(url)
 
-    # 2) IA Groq complementa
+    # IA Groq
     ia = ai_analyze_url(url, heur)
 
-    # 3) Score híbrido
+    # Score híbrido
     score_final = round((heur["score"] * 0.6) + (ia["score"] * 0.4), 2)
     classificacao = classify(score_final)
 
-    # 4) Monta resposta completa
     resultado_final = {
         "url": url,
         "heuristica": heur,
@@ -96,27 +81,25 @@ def check_url():
         "dataVerificacao": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     }
 
-    # 5) Salva no banco
-    novo = LinkCheck(
+    # Salvar no banco
+    registro = LinkCheck(
         url=url,
         score=score_final,
         nivel_risco=classificacao,
         motivos="; ".join(heur["motivos"]) + f" | IA: {ia['motivo']}",
         created_at=datetime.now()
     )
-
-    db.session.add(novo)
+    db.session.add(registro)
     db.session.commit()
 
     return jsonify(resultado_final)
 
 # ---------------------------------------------------------------
-# Rota de histórico
+# Histórico
 # ---------------------------------------------------------------
 
 @app.route("/api/history", methods=["GET"])
 def get_history():
-
     registros = LinkCheck.query.order_by(LinkCheck.created_at.desc()).limit(20).all()
 
     return jsonify([
@@ -135,8 +118,5 @@ def get_history():
 # ---------------------------------------------------------------
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-
-    print("Servidor rodando em http://127.0.0.1:8080")
+    print("Rodando localmente em http://127.0.0.1:8080")
     app.run(port=8080, debug=True)
